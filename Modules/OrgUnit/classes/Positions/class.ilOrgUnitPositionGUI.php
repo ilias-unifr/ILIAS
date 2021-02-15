@@ -14,6 +14,15 @@ class ilOrgUnitPositionGUI extends BaseCommands
     const CMD_CONFIRM_DELETION = 'confirmDeletion';
     const CMD_ASSIGN = 'assign';
 
+    public function __construct() {
+        global $DIC;
+
+        if (!ilObjOrgUnitAccess::_checkAccessPositions((int) $_GET['ref_id'])) {
+            ilUtil::sendFailure($DIC->language()->txt("permission_denied"), true);
+            $DIC->ctrl()->redirectByClass(ilObjOrgUnitGUI::class);
+        }
+    }
+
 
     /**
      * @return array
@@ -244,7 +253,7 @@ class ilOrgUnitPositionGUI extends BaseCommands
         $this->ctrl()->saveParameter($this, 'arid');
         $this->ctrl()->saveParameterByClass(ilOrgUnitDefaultPermissionGUI::class, 'arid');
         $this->pushSubTab(self::SUBTAB_SETTINGS, $this->ctrl()
-            ->getLinkTarget($this, self::CMD_INDEX));
+            ->getLinkTarget($this, self::CMD_EDIT));
         $this->pushSubTab(self::SUBTAB_PERMISSIONS, $this->ctrl()
             ->getLinkTargetByClass(ilOrgUnitDefaultPermissionGUI::class, self::CMD_INDEX));
     }

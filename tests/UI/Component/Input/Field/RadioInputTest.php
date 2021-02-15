@@ -25,7 +25,8 @@ class RadioInputTest extends ILIAS_UI_TestBase
         return new ILIAS\UI\Implementation\Component\Input\Field\Factory(
             new SignalGenerator(),
             $df,
-            new \ILIAS\Refinery\Factory($df, $language)
+            new \ILIAS\Refinery\Factory($df, $language),
+            $language
         );
     }
 
@@ -36,7 +37,7 @@ class RadioInputTest extends ILIAS_UI_TestBase
         $byline = "byline";
         $radio = $f->radio($label, $byline)
             ->withOption('value0', 'label0', 'byline0')
-            ->withOption('value1', 'label1', 'byline1')
+            ->withOption('1', 'label1', 'byline1')
             ->withNameFrom($this->name_source);
         return $radio;
     }
@@ -92,7 +93,7 @@ class RadioInputTest extends ILIAS_UI_TestBase
         $label = $radio->getLabel();
         $byline = $radio->getByline();
         $options = $radio->getOptions();
-        $value = array_keys($options)[0];
+        $value = '1';
         $radio = $radio->withValue($value);
         $expected = ""
             . "<div class=\"form-group row\">"
@@ -102,7 +103,7 @@ class RadioInputTest extends ILIAS_UI_TestBase
 
         foreach ($options as $opt_value => $opt_label) {
             $expected .= "<div class=\"form-control form-control-sm il-input-radiooption\">";
-            if ($opt_value === $value) {
+            if ($opt_value == $value) {
                 $expected .= "<input type=\"radio\" id=\"id_1_" . $opt_value . "_opt\" name=\"$name\" value=\"$opt_value\" checked=\"checked\"/>";
             } else {
                 $expected .= "<input type=\"radio\" id=\"id_1_" . $opt_value . "_opt\" name=\"$name\" value=\"$opt_value\" />";
@@ -121,6 +122,7 @@ class RadioInputTest extends ILIAS_UI_TestBase
 
         $this->assertHTMLEquals($expected, $r->render($radio));
     }
+
 
 
     public function test_render_disabled()

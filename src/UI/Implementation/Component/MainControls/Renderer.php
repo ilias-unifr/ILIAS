@@ -12,7 +12,10 @@ use ILIAS\UI\Component\MainControls\MainBar;
 use ILIAS\UI\Component\MainControls\MetaBar;
 use ILIAS\UI\Component\MainControls\Slate\Slate;
 use ILIAS\UI\Component\MainControls\Footer;
+use ILIAS\UI\Implementation\Component\Button\Bulky as IBulky;
+use ILIAS\UI\Implementation\Component\MainControls\Slate\Slate as ISlate;
 use ILIAS\UI\Implementation\Render\Template as UITemplateWrapper;
+use ILIAS\Data\URI;
 
 class Renderer extends AbstractComponentRenderer
 {
@@ -107,13 +110,12 @@ class Renderer extends AbstractComponentRenderer
         foreach ($entries as $k => $entry) {
             $button = $entry;
             $slate = null;
+            $js = '';
 
             if ($entry instanceof Slate) {
                 $slate = $entry;
                 $mb_id = $entry->getMainBarTreePosition();
-
                 $is_tool = $block === static::BLOCK_MAINBAR_TOOLS;
-                $js = '';
                 if ($is_tool) {
                     $js = $this->renderToolEntry($entry, $k, $mb_id, $component, $tpl, $default_renderer);
                 }
@@ -121,24 +123,33 @@ class Renderer extends AbstractComponentRenderer
                 $trigger_signal = $component->getTriggerSignal($mb_id, $component::ENTRY_ACTION_TRIGGER);
                 $this->trigger_signals[] = $trigger_signal;
                 $button = $f->button()->bulky($entry->getSymbol(), $entry->getName(), '#')
-                    ->withOnClick($trigger_signal)
-                    ->withAdditionalOnLoadCode(
-                        function ($id) use ($js, $mb_id, $k, $is_tool) {
-                            $add_as_tool = $is_tool ? 'true':'false';
-                            $js .= "
-                                il.UI.maincontrols.mainbar.addPartIdAndEntry('{$mb_id}', 'triggerer', '{$id}', {$add_as_tool});
-                                il.UI.maincontrols.mainbar.addMapping('{$k}','{$mb_id}');
-                            ";
-                            return $js;
-                        }
-                    );
+                    ->withAriaRole(IBulky::MENUITEM)
+                    ->withOnClick($trigger_signal);
+
+            } else {
+                //add Links/Buttons as toplevel entries
+                $pos = array_search($k, array_keys($entries));
+                $mb_id = '0:' .$pos;
+                $is_tool = false;
             }
 
+            $button = $button->withAdditionalOnLoadCode(
+                function ($id) use ($js, $mb_id, $k, $is_tool) {
+                    $add_as_tool = $is_tool ? 'true':'false';
+                    $js .= "
+                        il.UI.maincontrols.mainbar.addPartIdAndEntry('{$mb_id}', 'triggerer', '{$id}', {$add_as_tool});
+                        il.UI.maincontrols.mainbar.addMapping('{$k}','{$mb_id}');
+                    ";
+                    return $js;
+                }
+            );
             $tpl->setCurrentBlock($block);
             $tpl->setVariable("BUTTON", $default_renderer->render($button));
             $tpl->parseCurrentBlock();
 
             if ($slate) {
+                $entry = $entry->withAriaRole(ISlate::MENU);
+
                 $tpl->setCurrentBlock("slate_item");
                 $tpl->setVariable("SLATE", $default_renderer->render($entry));
                 $tpl->parseCurrentBlock();
@@ -151,11 +162,13 @@ class Renderer extends AbstractComponentRenderer
         $f = $this->getUIFactory();
         $tpl = $this->getTemplate("tpl.mainbar.html", true, true);
 
+        $tpl->setVariable("ARIA_LABEL", $this->txt('mainbar_aria_label'));
+
         //add "more"-slate
         $more_slate = $f->maincontrols()->slate()->combined(
             $component->getMoreButton()->getLabel(),
             $f->symbol()->glyph()->more()
-        );
+        )->withAriaRole(ISlate::MENU);
         $component = $component->withAdditionalEntry(
             '_mb_more_entry',
             $more_slate
@@ -181,7 +194,8 @@ class Renderer extends AbstractComponentRenderer
         //tools-section trigger
         if (count($component->getToolEntries()) > 0) {
             $btn_tools = $component->getToolsButton()
-                ->withOnClick($component->getToggleToolsSignal());
+                ->withOnClick($component->getToggleToolsSignal())
+                ->withAriaRole(IBulky::MENUITEM);
 
             $tpl->setCurrentBlock("tools_trigger");
             $tpl->setVariable("BUTTON", $default_renderer->render($btn_tools));
@@ -215,7 +229,8 @@ class Renderer extends AbstractComponentRenderer
         $more_symbol = $f->symbol()->glyph()->disclosure()
             ->withCounter($f->counter()->novelty(0))
             ->withCounter($f->counter()->status(0));
-        $more_slate = $f->maincontrols()->slate()->combined($more_label, $more_symbol, $f->legacy(''));
+        $more_slate = $f->maincontrols()->slate()->combined($more_label, $more_symbol, $f->legacy(''))
+            ->withAriaRole(ISlate::MENU);
         $entries[] = $more_slate;
 
         $this->renderTriggerButtonsAndSlates(
@@ -242,6 +257,8 @@ class Renderer extends AbstractComponentRenderer
 				";
             }
         );
+        $tpl->setVariable('ARIA_LABEL', $this->txt('metabar_aria_label'));
+
         $id = $this->bindJavaScript($component);
         $tpl->setVariable('ID', $id);
         return $tpl->get();
@@ -282,7 +299,8 @@ class Renderer extends AbstractComponentRenderer
                 $button = $f->button()->bulky($entry->getSymbol(), $entry->getName(), '#')
                     ->withOnClick($entry_signal)
                     ->appendOnClick($secondary_signal)
-                    ->withEngagedState($engaged);
+                    ->withEngagedState($engaged)
+                    ->withAriaRole(IBulky::MENUITEM);
 
                 $slate = $entry;
             } else {
@@ -297,6 +315,8 @@ class Renderer extends AbstractComponentRenderer
             $tpl->parseCurrentBlock();
 
             if ($slate) {
+                $slate = $slate->withAriaRole(ISlate::MENU);
+
                 $tpl->setCurrentBlock("slate_item");
                 $tpl->setVariable("SLATE", $default_renderer->render($slate));
                 $tpl->parseCurrentBlock();
@@ -351,10 +371,20 @@ class Renderer extends AbstractComponentRenderer
         $tpl->setVariable('TEXT', $component->getText());
 
         $perm_url = $component->getPermanentURL();
-        if ($perm_url) {
-            $url = $perm_url->getBaseURI() . '?' . $perm_url->getQuery();
+        if ($perm_url instanceof URI) {
+            // Since URI::__toString() is only available in ILIAS >= 7 we have to do that on our own...
+            $uri = $perm_url->getBaseURI();
+            $query = $perm_url->getQuery();
+            if ($query) {
+                $uri .= '?' . $query;
+            }
+            $fragment = $perm_url->getFragment();
+            if ($fragment) {
+                $uri .= '#' . $fragment;
+            }
+
             $tpl->setVariable('PERMA_LINK_LABEL', $this->txt('perma_link'));
-            $tpl->setVariable('PERMANENT_URL', $url);
+            $tpl->setVariable('PERMANENT_URL', $uri);
         }
         return $tpl->get();
     }
@@ -368,6 +398,7 @@ class Renderer extends AbstractComponentRenderer
         $registry->register('./src/UI/templates/js/MainControls/mainbar.js');
         $registry->register('./src/UI/templates/js/MainControls/metabar.js');
         $registry->register('./src/GlobalScreen/Client/dist/GS.js');
+        $registry->register('./src/UI/templates/js/MainControls/footer.js');
     }
 
     /**

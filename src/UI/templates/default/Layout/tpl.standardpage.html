@@ -3,11 +3,14 @@
 <head>
 	<meta charset="utf-8" />
 	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 
-	<!-- BEGIN base -->
+	<!-- BEGIN for_ui_examples_only -->
+    <!-- ATTENTION: This only exists to provide an example of the complete page.     -->
+    <!-- This won't be included in renderings of ordinary pages. Also have a look    -->
+    <!-- into \ILIAS\UI\Implementation\Component\Layout\Page\Renderer::setHeaderVars -->
 	<base href="{BASE}" />
-	<!-- END base -->
+	<!-- END for_ui_examples_only -->
 
 	<title>{SHORT_TITLE}: {VIEW_TITLE}</title>
 
@@ -26,7 +29,7 @@
 
 <body>
 
-	<section class="il-layout-page<!-- BEGIN slates_engaged --> with-mainbar-slates-engaged<!-- END slates_engaged -->">
+	<div class="il-layout-page<!-- BEGIN slates_engaged --> with-mainbar-slates-engaged<!-- END slates_engaged -->">
 
 		<header>
 			<div class="header-inner">
@@ -46,13 +49,13 @@
 			</div>
 		</header>
 
-		<nav class="breadcrumbs">
+		<div class="breadcrumbs">
 			{BREADCRUMBS}
-		</nav>
+		</div>
 
-		<nav class="nav il-maincontrols">
+		<div class="nav il-maincontrols">
 			{MAINBAR}
-		</nav>
+		</div>
 
 		<!-- html5 main-tag is not supported in IE / div is needed -->
 		<main class="il-layout-page-content">
@@ -65,14 +68,14 @@
 
 
 			<!-- BEGIN pagefooter -->
-			<footer>
+			<footer role="contentinfo">
 				{FOOTER}
 			</footer>
 			<!-- END pagefooter -->
 		</main>
 
 
-	</section>
+	</div>
 
 
 <!-- BEGIN on_load_code -->

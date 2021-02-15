@@ -53,9 +53,9 @@ class ilStudyProgrammeUserProgress
     }
 
     /**
-     * Get the program node where this progress belongs to was made.
+     * Get the program node this progress belongs to.
      *
-     * Throws when program this assignment is about has no ref id.
+     * Throws when the according program has no ref id.
      *
      * TODO: I'm quite sure, this will profit from caching.
      *
@@ -213,6 +213,11 @@ class ilStudyProgrammeUserProgress
         $this->progress->setValidityOfQualification($date);
     }
 
+    public function storeProgress() : void
+    {
+        $this->progress_repository->update($this->progress);
+    }
+
     /**
      * Delete the assignment from database.
      */
@@ -307,13 +312,12 @@ class ilStudyProgrammeUserProgress
             throw new ilException("Can't mark as failed since program is passed.");
         }
 
-        $this->progress_repository->update(
-            $this->progress
-                ->setStatus(ilStudyProgrammeProgress::STATUS_FAILED)
-                ->setLastChangeBy($a_user_id)
-                ->setCompletionDate(null)
-        );
+        $this->progress
+            ->setStatus(ilStudyProgrammeProgress::STATUS_FAILED)
+            ->setLastChangeBy($a_user_id)
+            ->setCompletionDate(null);
 
+        $this->progress_repository->update($this->progress);
         $this->refreshLPStatus();
 
         return $this;
@@ -577,7 +581,10 @@ class ilStudyProgrammeUserProgress
         $deadline = $this->getDeadline();
         $today = date(ilStudyProgrammeProgress::DATE_FORMAT);
 
-        if ($deadline && $deadline->format(ilStudyProgrammeProgress::DATE_FORMAT) < $today) {
+        if ($deadline
+            && $deadline->format(ilStudyProgrammeProgress::DATE_FORMAT) < $today
+            && $this->progress->getStatus() === ilStudyProgrammeProgress::STATUS_IN_PROGRESS
+        ) {
             $this->progress_repository->update(
                 $this->progress
                     ->setStatus(ilStudyProgrammeProgress::STATUS_FAILED)
@@ -998,5 +1005,16 @@ class ilStudyProgrammeUserProgress
         if ($send) {
             $usr_progress_db->reminderSendFor($usr_progress->getId());
         }
+    }
+
+    public function hasSuccessStatus() : bool
+    {
+        return in_array(
+            $this->getStatus(),
+            [
+                ilStudyProgrammeProgress::STATUS_COMPLETED,
+                ilStudyProgrammeProgress::STATUS_ACCREDITED
+            ]
+        );
     }
 }

@@ -292,6 +292,7 @@ class ilLMPresentationGUI
         $lng = $this->lng;
         $ilCtrl = $this->ctrl;
         $ilUser = $this->user;
+        $ilErr = $this->error;
 
         // check read permission and parent conditions
         // todo: replace all this by ilAccess call
@@ -917,7 +918,6 @@ class ilLMPresentationGUI
     public function ilLMSubMenu()
     {
         $rbacsystem = $this->rbacsystem;
-        
         if ($this->abstract) {
             return;
         }
@@ -951,33 +951,9 @@ class ilLMPresentationGUI
             }
 
             $page_id = $this->getCurrentPageId();
-            
-            $plinkgui = new ilPermanentLinkGUI(
-                "pg",
-                $page_id . "_" . $this->lm->getRefId(),
-                "",
-                "_top"
-            );
 
-            $title = $this->getLMPresentationTitle();
-            $pg_title = ilLMPageObject::_getPresentationTitle(
-                $page_id,
-                $this->lm->getPageHeader(),
-                $this->lm->isActiveNumbering(),
-                $this->lm_set->get("time_scheduled_page_activation"),
-                false,
-                0,
-                $this->lang
-            );
-            if ($pg_title != "") {
-                $title .= ": " . $pg_title;
-            }
-            
-            $plinkgui->setTitle($title);
-                
-            $tpl_menu->setCurrentBlock("perma_link");
-            $tpl_menu->setVariable("PERMA_LINK", $plinkgui->getHTML());
-            $tpl_menu->parseCurrentBlock();
+            // permanent link
+            $this->tpl->setPermanentLink("pg", "",  $page_id . "_" . $this->lm->getRefId());
         }
 
         $this->tpl->setVariable("SUBMENU", $tpl_menu->get());
@@ -1456,6 +1432,8 @@ class ilLMPresentationGUI
         $tpl->setVariable("TOP_NAVIGATION", $navigation_renderer->renderTop());
         $tpl->setVariable("BOTTOM_NAVIGATION", $navigation_renderer->renderBottom());
         $tpl->setVariable("PAGE_CONTENT", $this->getPageContent());
+        $tpl->setVariable("RATING", $this->renderRating());
+
 
         return $tpl->get();
     }
@@ -1479,7 +1457,6 @@ class ilLMPresentationGUI
         return $content_renderer->render();
     }
 
-
     /**
      * Render rating
      *
@@ -1491,7 +1468,7 @@ class ilLMPresentationGUI
         $rating = "";
         if ($this->lm->hasRatingPages() && !$this->offlineMode()) {
             $rating_gui = new ilRatingGUI();
-            $rating_gui->setObject($this->lm->getId(), "lm", $page_id, "lm");
+            $rating_gui->setObject($this->lm->getId(), "lm", $this->getCurrentPageId(), "lm");
             $rating_gui->setYourRatingText($this->lng->txt("lm_rate_page"));
 
             /*
@@ -1499,7 +1476,7 @@ class ilLMPresentationGUI
                     "il.ExcPeerReview.saveComments(".$a_set["peer_id"].", %rating%)"));
             */
 
-            $this->ctrl->setParameter($this, "pgid", $page_id);
+            $this->ctrl->setParameter($this, "pgid", $this->getCurrentPageId());
             $this->tpl->addOnLoadCode("il.LearningModule.setRatingUrl('" .
                 $this->ctrl->getLinkTarget($this, "updatePageRating", "", true, false) .
                 "')");
@@ -1511,6 +1488,7 @@ class ilLMPresentationGUI
         }
         return $rating;
     }
+
 
     
     public function updatePageRating()
@@ -1625,7 +1603,7 @@ class ilLMPresentationGUI
 
         $media_obj = new ilObjMediaObject($this->requested_mob_id);
         if (!empty($_GET["pg_id"])) {
-            $pg_obj = $this->getLMPage($_GET["pg_id"]);
+            $pg_obj = $this->getLMPage($_GET["pg_id"], $_GET["pg_type"]);
             $pg_obj->buildDom();
 
             $xml = "<dummy>";
@@ -2949,12 +2927,23 @@ class ilLMPresentationGUI
      * @param
      * @return
      */
-    public function getLMPage($a_id)
+    public function getLMPage($a_id, $a_type = "")
     {
-        if ($this->lang != "-" && ilPageObject::_exists("lm", $a_id, $this->lang)) {
-            return new ilLMPage($a_id, 0, $this->lang);
+        $type = ($a_type == "mep")
+            ? "mep"
+            : "lm";
+
+        $lang = $this->lang;
+        if (!ilPageObject::_exists($type, $a_id, $lang)) {
+            $lang = "-";
         }
-        return new ilLMPage($a_id);
+
+        switch ($type) {
+            case "mep":
+                return new ilMediaPoolPage($a_id, 0, $lang);
+            default:
+                return new ilLMPage($a_id, 0, $lang);
+        }
     }
 
     /**

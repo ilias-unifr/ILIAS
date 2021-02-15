@@ -400,6 +400,7 @@ class ilLPTableBaseGUI extends ilTable2GUI
         $options['copa'] = $lng->txt('objs_copa');
         $options['cmix'] = $lng->txt('objs_cmix');
         $options['lti'] = $lng->txt('objs_lti');
+        $options['lso'] = $lng->txt('objs_lso');
 
         if ($a_allow_undefined_lp) {
             $options["webr"] = $lng->txt("objs_webr");
@@ -705,8 +706,8 @@ class ilLPTableBaseGUI extends ilTable2GUI
 
     protected function showTimingsWarning($a_ref_id, $a_user_id)
     {
-        include_once 'Modules/Course/classes/Timings/class.ilTimingCache.php';
-        if (ilTimingCache::_showWarning($a_ref_id, $a_user_id)) {
+        $timing_cache = ilTimingCache::getInstanceByRefId($a_ref_id);
+        if ($timing_cache->isWarningRequired($a_user_id)) {
             $timings = ilTimingCache::_getTimings($a_ref_id);
             if ($timings['item']['changeable'] && $timings['user'][$a_user_id]['end']) {
                 $end = $timings['user'][$a_user_id]['end'];

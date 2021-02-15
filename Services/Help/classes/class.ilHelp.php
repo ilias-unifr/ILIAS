@@ -33,10 +33,10 @@ class ilHelp
             return "";
         }
 
-        if ($ilUser->prefs["hide_help_tt"]) {
+        if ($ilUser->getPref("hide_help_tt")) {
             return "";
         }
-
+        
         if (OH_REF_ID > 0) {
             $module_id = 0;
         } else {
@@ -55,7 +55,7 @@ class ilHelp
         if ($rec["tt_text"] != "") {
             $t = $rec["tt_text"];
             if ($module_id == 0) {
-                $t .= "<br/><i class='small'>" . $a_tt_id . "</i>";
+                $t .= "<br/><i>(" . $a_tt_id . ")</i>";
             }
             return $t;
         } else { // try to get general version
@@ -70,7 +70,7 @@ class ilHelp
             if ($rec["tt_text"] != "") {
                 $t = $rec["tt_text"];
                 if ($module_id == 0) {
-                    $t .= "<br/><i class='small'>" . $a_tt_id . "</i>";
+                    $t .= "<br/><i>(" . $a_tt_id . ")</i>";
                 }
                 return $t;
             }

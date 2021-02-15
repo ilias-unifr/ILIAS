@@ -29,6 +29,11 @@ interface Factory
      *       Nodes MUST restrict themselves to a minimal presentation, i.e.
      *       they MUST solely display information supportive and relevant for
      *       the intended task.
+     *   accessibility:
+     *     1: Nodes with further subnodes MUST bear the "aria-expanded" attribute.
+     *     2: Nodes with further subnodes MUST bear the ARIA role "treeitem".
+     *     3: Nodes without further subnodes MUST bear the ARIA role "none".
+     *     4: A group of subnodes MUST bear the ARIA role "group".
      *
      * ---
      * @return \ILIAS\UI\Component\Tree\Node\Factory
@@ -53,7 +58,6 @@ interface Factory
      *   effect: >
      *     When clicking a Node, it will expand or collapse, thus showing or hiding
      *     its sub-Nodes.
-     *
      * rules:
      *   usage:
      *     1: >
@@ -63,11 +67,19 @@ interface Factory
      *        Expandable Trees SHOULD NOT be used to display several aspects of one
      *        topic/item, like it would be the case when e.g. listing a repository
      *        object and its properties as individual nodes.
-     *
+     *   accessibility:
+     *     1: Expandable Trees MUST bear the ARIA role "tree".
+     *     2: The "aria-label" attribute MUST be set for Expandable Trees.
+     *     3: The "aria-label" attribute MUST be language-dependant.
+     *     4: >
+     *        The "aria-label" attribute MUST describe the content of the Tree as
+     *        precisely as possible. "Tree" MUST NOT be set as label, labels like
+     *        "Forum Posts" or "Mail Folders" are much more helpful.
+     *        (Note that "Tree" is already set by the ARIA role attribute.)
      * ---
+     * @param string $label
      * @param TreeRecursion $recursion
-     *
      * @return \ILIAS\UI\Component\Tree\Expandable
      */
-    public function expandable(TreeRecursion $recursion) : Expandable;
+    public function expandable(string $label, TreeRecursion $recursion) : Expandable;
 }

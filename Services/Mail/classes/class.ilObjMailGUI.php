@@ -374,9 +374,9 @@ class ilObjMailGUI extends ilObjectGUI
     }
 
     /**
-     * @param bool $is_manual_mail
+     * @param bool $isManualMail
      */
-    protected function sendTestMail($is_manual_mail = false)
+    protected function sendTestMail($isManualMail = false)
     {
         if (!$this->isViewAllowed()) {
             $this->ilias->raiseError($this->lng->txt('msg_no_perm_write'), $this->ilias->error_obj->WARNING);
@@ -386,7 +386,7 @@ class ilObjMailGUI extends ilObjectGUI
             return $this->showExternalSettingsFormObject();
         }
 
-        if ($is_manual_mail) {
+        if ($isManualMail) {
             $mail = new ilMail($GLOBALS['DIC']->user()->getId());
         } else {
             $mail = new ilMail(ANONYMOUS_USER_ID);
@@ -394,7 +394,20 @@ class ilObjMailGUI extends ilObjectGUI
 
         $mail->setSaveInSentbox(false);
         $mail->appendInstallationSignature(true);
-        $mail->enqueue($GLOBALS['DIC']->user()->getEmail(), '', '', 'Test Subject', 'Test Body', array());
+
+        $lngVariablePrefix = 'sys';
+        if ($isManualMail) {
+            $lngVariablePrefix = 'usr';
+        }
+
+        $mail->enqueue(
+            $GLOBALS['DIC']->user()->getEmail(),
+            '',
+            '',
+            $this->lng->txt('mail_email_' .$lngVariablePrefix . '_subject'),
+            $this->lng->txt('mail_email_' . $lngVariablePrefix . '_body'),
+            []
+        );
 
         ilUtil::sendSuccess($this->lng->txt('mail_external_test_sent'));
         $this->showExternalSettingsFormObject();
@@ -444,12 +457,14 @@ class ilObjMailGUI extends ilObjectGUI
 
         $user = new ilTextInputGUI($this->lng->txt('mail_smtp_user'), 'mail_smtp_user');
         $user->setDisabled(!$this->isEditingAllowed());
+        $user->setDisableHtmlAutoComplete(true);
         $smtp->addSubItem($user);
 
         $password = new ilPasswordInputGUI($this->lng->txt('mail_smtp_password'), 'mail_smtp_password');
         $password->setRetype(false);
         $password->setSkipSyntaxCheck(true);
         $password->setDisabled(!$this->isEditingAllowed());
+        $password->setDisableHtmlAutoComplete(true);
         $smtp->addSubItem($password);
 
         $pre = new ilTextInputGUI($this->lng->txt('mail_subject_prefix'), 'mail_subject_prefix');

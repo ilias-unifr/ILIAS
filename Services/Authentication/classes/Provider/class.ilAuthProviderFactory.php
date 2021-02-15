@@ -76,6 +76,11 @@ class ilAuthProviderFactory
                 include_once './Services/Authentication/classes/Provider/class.ilAuthProviderDatabase.php';
                 return new ilAuthProviderDatabase($credentials);
                 
+            case AUTH_SOAP:
+                $this->getLogger()->debug('Using SOAP authentication.');
+                include_once './Services/SOAPAuth/classes/class.ilAuthProviderSoap.php';
+                return new ilAuthProviderSoap($credentials);
+                
             case AUTH_APACHE:
                 $this->getLogger()->debug('Using apache authentication.');
                 include_once './Services/AuthApache/classes/class.ilAuthProviderApache.php';
@@ -107,11 +112,10 @@ class ilAuthProviderFactory
                 return new ilAuthProviderECS($credentials);
 
             case AUTH_SAML:
-                $saml_info = explode('_', $a_authmode);
                 $this->getLogger()->debug('Using apache authentication.');
                 require_once 'Services/Saml/classes/class.ilAuthProviderSaml.php';
                 require_once 'Services/Saml/classes/class.ilSamlIdp.php';
-                return new ilAuthProviderSaml($credentials, ilSamlIdp::getIdpIdByAuthMode($saml_info[1]));
+                return new ilAuthProviderSaml($credentials, ilSamlIdp::getIdpIdByAuthMode($a_authmode));
 
             case AUTH_OPENID_CONNECT:
                 $this->getLogger()->debug('Using openid connect authentication.');

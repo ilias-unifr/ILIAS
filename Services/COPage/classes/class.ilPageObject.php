@@ -1365,13 +1365,14 @@ abstract class ilPageObject
         }
 
         $xml .= "</LVs>";
-
         return $xml;
     }
 
     public function appendLangVarXML(&$xml, $var)
     {
-        $xml .= "<LV name=\"$var\" value=\"" . $this->lng->txt("cont_" . $var) . "\"/>";
+        $val = $this->lng->txt("cont_" . $var);
+        $val = str_replace('"', "&quot;", $val);
+        $xml .= "<LV name=\"$var\" value=\"" . $val . "\"/>";
     }
 
     // @todo begin: move this to paragraph class
@@ -3429,7 +3430,7 @@ abstract class ilPageObject
             // of sibling at $a_pos
             $pos = explode("_", $a_pos);
             $target_pos = array_pop($pos);
-            $parent_pos = implode($pos, "_");
+            $parent_pos = implode("_", $pos);
         } else {		// if we should insert a child, $a_pos is alreade the hierarchical id
             // of the parent node
             $parent_pos = $a_pos;
@@ -3521,7 +3522,7 @@ abstract class ilPageObject
             // of sibling at $a_pos
             $pos = explode("_", $a_pos);
             $target_pos = array_pop($pos);
-            $parent_pos = implode($pos, "_");
+            $parent_pos = implode("_", $pos);
         } else {		// if we should insert a child, $a_pos is alreade the hierarchical id
             // of the parent node
             $parent_pos = $a_pos;

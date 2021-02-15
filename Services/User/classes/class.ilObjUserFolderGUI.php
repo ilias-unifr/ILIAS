@@ -40,10 +40,8 @@ class ilObjUserFolderGUI extends ilObjectGUI
         global $DIC;
 
         $ilCtrl = $DIC['ilCtrl'];
-
         // TODO: move this to class.ilias.php
         define('USER_FOLDER_ID', 7);
-        
         $this->type = "usrf";
         parent::__construct($a_data, $a_id, $a_call_by_reference, false);
         
@@ -159,6 +157,29 @@ class ilObjUserFolderGUI extends ilObjectGUI
                 break;
         }
         return true;
+    }
+
+    /**
+     * @param string $a_permission
+     */
+    protected function checkAccess($a_permission)
+    {
+        global $DIC;
+
+        $ilErr = $DIC['ilErr'];
+
+        if (!$this->checkAccessBool($a_permission)) {
+            $ilErr->raiseError($this->lng->txt('msg_no_perm_read'), $ilErr->WARNING);
+        }
+    }
+
+    /**
+     * @param string $a_permission
+     * @return bool
+     */
+    protected function checkAccessBool($a_permission)
+    {
+        return $this->access->checkAccess($a_permission, '', $this->ref_id);
     }
 
     public function learningProgressObject()
@@ -2274,6 +2295,7 @@ class ilObjUserFolderGUI extends ilObjectGUI
         $ilias->setSetting('mail_incoming_mail', (int) $_POST['select']['default_mail_incoming_mail']);
         $ilias->setSetting('chat_osc_accept_msg', ilUtil::stripSlashes($_POST['select']['default_chat_osc_accept_msg']));
         $ilias->setSetting('bs_allow_to_contact_me', ilUtil::stripSlashes($_POST['select']['default_bs_allow_to_contact_me']));
+        $ilias->setSetting('hide_own_online_status', ilUtil::stripSlashes($_POST['select']['default_hide_own_online_status']));
 
         ilUtil::sendSuccess($this->lng->txt("usr_settings_saved"));
         $this->settingsObject();
@@ -2373,141 +2395,54 @@ class ilObjUserFolderGUI extends ilObjectGUI
     }
 
     /**
-    * Global user settings
-    *
-    * Allows to define global settings for user accounts
-    *
-    * Note: The Global user settings form allows to specify default values
-    *       for some user preferences. To avoid redundant implementations,
-    *       specification of default values can be done elsewhere in ILIAS
-    *       are not supported by this form.
-    */
+     * @throws ilObjectException
+     */
+    protected function performExportObject()
+    {
+        $this->checkPermission("write,read_users");
+
+        $this->object->buildExportFile($_POST["export_type"]);
+        $this->ctrl->redirect($this, 'export');
+    }
+
+    /**
+     *
+     */
     public function exportObject()
     {
         global $DIC;
 
         $this->checkPermission("write,read_users");
 
-        $ilias = $DIC['ilias'];
-        $ilCtrl = $DIC['ilCtrl'];
-        
-        if ($_POST["cmd"]["export"]) {
-            $this->object->buildExportFile($_POST["export_type"]);
-            $this->ctrl->redirectByClass("ilobjuserfoldergui", "export");
-            exit;
-        }
-        
-        $this->tpl->addBlockfile('ADM_CONTENT', 'adm_content', 'tpl.usr_export.html', 'Services/User');
-        
+        $button = ilSubmitButton::getInstance();
+        $button->setCaption('create_export_file');
+        $button->setCommand('performExport');
+        $toolbar = $DIC->toolbar();
+        $toolbar->setFormAction($this->ctrl->getFormAction($this));
+
         $export_types = array(
             "userfolder_export_excel_x86",
             "userfolder_export_csv",
             "userfolder_export_xml"
         );
-
-        // create table
-        include_once("./Services/Table/classes/class.ilTableGUI.php");
-        $tbl = new ilTableGUI();
-
-        // load files templates
-        $this->tpl->addBlockfile("EXPORT_FILES", "export_files", "tpl.table.html");
-
-        // load template for table content data
-        $this->tpl->addBlockfile("TBL_CONTENT", "tbl_content", "tpl.usr_export_file_row.html", "Services/User");
-
-        $num = 0;
-
-        $tbl->setTitle($this->lng->txt("userfolder_export_files"));
-
-        $tbl->setHeaderNames(array("", $this->lng->txt("userfolder_export_file"),
-            $this->lng->txt("userfolder_export_file_size"), $this->lng->txt("date") ));
-        $tbl->setHeaderVars(array(), $ilCtrl->getParameterArray($this, "export"));
-
-        $tbl->enabled["sort"] = false;
-        $tbl->setColumnWidth(array("1%", "49%", "25%", "25%"));
-
-        // control
-        $tbl->setOrderColumn($_GET["sort_by"]);
-        $tbl->setOrderDirection($_GET["sort_order"]);
-        $tbl->setLimit($_GET["limit"]);
-        $tbl->setOffset($_GET["offset"]);
-        $tbl->setMaxCount($this->maxcount);		// ???
-
-
-        $this->tpl->setVariable("COLUMN_COUNTS", 4);
-
-        // delete button
-        $this->tpl->setVariable("IMG_ARROW", ilUtil::getImagePath("arrow_downright.svg"));
-        $this->tpl->setVariable("ALT_ARROW", $this->lng->txt("actions"));
-        $this->tpl->setCurrentBlock("tbl_action_btn");
-        $this->tpl->setVariable("BTN_NAME", "confirmDeleteExportFile");
-        $this->tpl->setVariable("BTN_VALUE", $this->lng->txt("delete"));
-        $this->tpl->parseCurrentBlock();
-
-        $this->tpl->setCurrentBlock("tbl_action_btn");
-        $this->tpl->setVariable("BTN_NAME", "downloadExportFile");
-        $this->tpl->setVariable("BTN_VALUE", $this->lng->txt("download"));
-        $this->tpl->parseCurrentBlock();
-
-        // footer
-        $tbl->setFooter("tblfooter", $this->lng->txt("previous"), $this->lng->txt("next"));
-        //$tbl->disable("footer");
-
-        $export_files = $this->object->getExportFiles();
-
-        $tbl->setMaxCount(count($export_files));
-        $export_files = array_slice($export_files, $_GET["offset"], $_GET["limit"]);
-
-        $tbl->render();
-
-        if (count($export_files) > 0) {
-            $i = 0;
-            foreach ($export_files as $exp_file) {
-                $this->tpl->setCurrentBlock("tbl_content");
-                $this->tpl->setVariable("TXT_FILENAME", $exp_file["filename"]);
-
-                $css_row = ilUtil::switchColor($i++, "tblrow1", "tblrow2");
-                $this->tpl->setVariable("CSS_ROW", $css_row);
-
-                $this->tpl->setVariable("TXT_SIZE", $exp_file["filesize"]);
-                $this->tpl->setVariable("CHECKBOX_ID", $exp_file["filename"]);
-
-                $file_arr = explode("__", $exp_file["filename"]);
-                $this->tpl->setVariable('TXT_DATE', ilDatePresentation::formatDate(new ilDateTime($file_arr[0], IL_CAL_UNIX)));
-
-                $this->tpl->parseCurrentBlock();
-            }
-        
-            $this->tpl->setCurrentBlock("selectall");
-            $this->tpl->setVariable("SELECT_ALL", $this->lng->txt("select_all"));
-            $this->tpl->setVariable("CSS_ROW", $css_row);
-            $this->tpl->parseCurrentBlock();
-        } //if is_array
-        /*
-        else
-
-        {
-            $this->tpl->setCurrentBlock("notfound");
-            $this->tpl->setVariable("TXT_OBJECT_NOT_FOUND", $this->lng->txt("obj_not_found"));
-            $this->tpl->setVariable("NUM_COLS", 3);
-            $this->tpl->parseCurrentBlock();
+        $options = [];
+        foreach ($export_types as $type) {
+            $options[$type] = $this->lng->txt($type);
         }
-        */
-        
-        $this->tpl->parseCurrentBlock();
-        
-        
-        foreach ($export_types as $export_type) {
-            $this->tpl->setCurrentBlock("option");
-            $this->tpl->setVariable("OPTION_VALUE", $export_type);
-            $this->tpl->setVariable("OPTION_TEXT", $this->lng->txt($export_type));
-            $this->tpl->parseCurrentBlock();
-        }
+        $type_selection = new \ilSelectInputGUI('','export_type');
+        $type_selection->setOptions($options);
 
-        $this->tpl->setVariable("EXPORT_BUTTON", $this->lng->txt("create_export_file"));
-        $this->tpl->setVariable("FORMACTION", $this->ctrl->getFormAction($this));
+        $toolbar->addInputItem($type_selection, true);
+        $toolbar->addButtonInstance($button);
+
+        $table = new \ilUserExportFileTableGUI($this, 'export');
+        $table->init();
+        $table->parse($this->object->getExportFiles());
+
+        $this->tpl->setContent($table->getHTML());
     }
-    
+
+
     protected function initNewAccountMailForm()
     {
         global $DIC;
@@ -2715,15 +2650,6 @@ class ilObjUserFolderGUI extends ilObjectGUI
                 "",
                 ""
             );
-
-            /* deprecated, JF 27 May 2013
-            if(ilObjUserTracking::_enabledLearningProgress() &&
-                ilObjUserTracking::_enabledUserRelatedData())
-            {
-                $tabs_gui->addTarget("learning_progress",
-                                     $this->ctrl->getLinkTarget($this, "learningProgress"), "learningProgress", "", "");
-            }
-            */
         }
 
         if ($rbacsystem->checkAccess('edit_permission', $this->object->getRefId())) {
@@ -2975,41 +2901,48 @@ class ilObjUserFolderGUI extends ilObjectGUI
 
         $rbacsystem = $DIC['rbacsystem'];
         $ilUser = $DIC['ilUser'];
-        
+
+        $cmds = array();
         // see searchResultHandler()
         if ($a_search_form) {
-            $cmds = array(
-                'activate' => $this->lng->txt('activate'),
-                'deactivate' => $this->lng->txt('deactivate'),
-                'accessRestrict' => $this->lng->txt('accessRestrict'),
-                'accessFree' => $this->lng->txt('accessFree')
-                );
-        
-            if ($rbacsystem->checkAccess('delete', $this->object->getRefId())) {
+
+            if($this->checkAccessBool('write')) {
+                $cmds = array(
+                    'activate' => $this->lng->txt('activate'),
+                    'deactivate' => $this->lng->txt('deactivate'),
+                    'accessRestrict' => $this->lng->txt('accessRestrict'),
+                    'accessFree' => $this->lng->txt('accessFree')
+                    );
+            }
+
+            if ($this->checkAccessBool('delete')) {
                 $cmds["delete"] = $this->lng->txt("delete");
             }
         }
         // show confirmation
         else {
-            $cmds = array(
-                'activateUsers' => $this->lng->txt('activate'),
-                'deactivateUsers' => $this->lng->txt('deactivate'),
-                'restrictAccess' => $this->lng->txt('accessRestrict'),
-                'freeAccess' => $this->lng->txt('accessFree')
+            if($this->checkAccessBool('write')) {
+                $cmds = array(
+                    'activateUsers'   => $this->lng->txt('activate'),
+                    'deactivateUsers' => $this->lng->txt('deactivate'),
+                    'restrictAccess'  => $this->lng->txt('accessRestrict'),
+                    'freeAccess'      => $this->lng->txt('accessFree')
                 );
+            }
             
-            if ($rbacsystem->checkAccess('delete', $this->object->getRefId())) {
+            if ($this->checkAccessBool('delete')) {
                 $cmds["deleteUsers"] = $this->lng->txt("delete");
             }
         }
-                
-        // no confirmation needed
-        $export_types = array("userfolder_export_excel_x86", "userfolder_export_csv", "userfolder_export_xml");
-        foreach ($export_types as $type) {
-            $cmd = explode("_", $type);
-            $cmd = array_pop($cmd);
-            $cmds['usrExport' . ucfirst($cmd)] = $this->lng->txt('export') . ' - ' .
-                $this->lng->txt($type);
+        
+        if($this->checkAccessBool('write')) {
+            $export_types = array("userfolder_export_excel_x86", "userfolder_export_csv", "userfolder_export_xml");
+            foreach ($export_types as $type) {
+                $cmd                               = explode("_", $type);
+                $cmd                               = array_pop($cmd);
+                $cmds['usrExport' . ucfirst($cmd)] = $this->lng->txt('export') . ' - ' .
+                    $this->lng->txt($type);
+            }
         }
         
         // check if current user may send mails

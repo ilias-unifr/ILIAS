@@ -8,11 +8,8 @@
 	padding: @il-item-padding;
 	.clearfix();
 
-	h5 {
-		margin: 0;
+	.il-item-title {
 		font-size: @font-size-base;
-		float: left;
-
 		.btn-link, a {
 			font-size: inherit;
 			line-height: @line-height-base;
@@ -67,7 +64,7 @@
 	clear: both;
 	background-color: @il-secondary-container-bg;
 
-	> h4 {
+	> h3 {
 		float:left;
 		color: @panel-heading-color;
 		font-size: @font-size-h4;
@@ -109,7 +106,7 @@
 }
 
 /* this is currently experimental, could be removed */
-@media only screen and (min-width: (@grid-float-breakpoint-max + 1)) {
+@media only screen and (min-width: (@grid-float-breakpoint-max + 1px)) {
 
 	.panel-secondary .il-item {
 		padding: @padding-large-vertical @padding-small-horizontal;

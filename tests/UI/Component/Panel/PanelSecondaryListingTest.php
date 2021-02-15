@@ -12,7 +12,7 @@ use \ILIAS\UI\Implementation\Component\SignalGenerator;
 /**
  * Test secondary listing panels
  */
-class PanelSecodaryListingTest extends ILIAS_UI_TestBase
+class PanelSecondaryListingTest extends ILIAS_UI_TestBase
 {
     public function getUIFactory()
     {
@@ -133,7 +133,7 @@ class PanelSecodaryListingTest extends ILIAS_UI_TestBase
         $expected_html = <<<EOT
 <div class="panel panel-secondary panel-flex">
 	<div class="panel-heading ilHeader clearfix">
-		<h3 class="ilHeader">Title</h3>
+		<h4 class="ilHeader">Title</h4>
 		<div class="dropdown"><button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown"  aria-label="actions" aria-haspopup="true" aria-expanded="false"> <span class="caret"></span></button>
 			<ul class="dropdown-menu">
 				<li><button class="btn btn-link" data-action="https://www.ilias.de" id="id_1">ILIAS</button></li>
@@ -166,7 +166,7 @@ EOT;
         $expected_html = <<<EOT
 <div class="panel panel-secondary panel-flex">
 	<div class="panel-heading ilHeader clearfix">
-		<h3 class="ilHeader">Title</h3>
+		<h4 class="ilHeader">Title</h4>
 		<div class="il-viewcontrol-sortation" id="">
 			<div class="dropdown">
 				<button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-label="actions" aria-haspopup="true" aria-expanded="false">
@@ -205,7 +205,7 @@ EOT;
         $expected_html = <<<EOT
 <div class="panel panel-secondary panel-flex">
 	<div class="panel-heading ilHeader clearfix">
-		<h3 class="ilHeader">Title</h3>
+		<h4 class="ilHeader">Title</h4>
 		<div class="il-viewcontrol-pagination">
 			<span class="browse previous">
 				<a class="glyph" href="http://ilias.de?page=0" aria-label="back">
@@ -249,15 +249,15 @@ EOT;
         $expected_html = <<<EOT
 <div class="panel panel-secondary panel-flex">
 	<div class="panel-heading ilHeader clearfix">
-		<h3 class="ilHeader">Title</h3>
+		<h4 class="ilHeader">Title</h4>
 		<div class="il-viewcontrol-section">
-			<a class="btn btn-default " type="button" href="http://www.ilias.de" aria-label="previous" data-action="http://www.ilias.de">
+			<a class="btn btn-default " href="http://www.ilias.de" aria-label="previous" data-action="http://www.ilias.de">
 				<span class="glyphicon glyphicon-chevron-left"></span>
 			</a>
 			<button class="btn btn-default" data-action="">
 				current
 			</button>
-			<a class="btn btn-default " type="button" href="http://www.github.com" aria-label="next" data-action="http://www.github.com">
+			<a class="btn btn-default " href="http://www.github.com" aria-label="next" data-action="http://www.github.com">
 				<span class="glyphicon glyphicon-chevron-right"></span>
 			</a>
 		</div>
@@ -270,5 +270,72 @@ EOT;
             $this->cleanHTML($expected_html),
             $this->cleanHTML($html)
         );
+    }
+    public function test_render_with_footer()
+    {
+        $footer_shy_button = $this->getUIFactory()->button()->shy("Action", "");
+        $secondary_panel = $this->getUIFactory()->panelSecondary()->listing("", array())->withFooter($footer_shy_button);
+
+        $html = $this->getDefaultRenderer()->render($secondary_panel);
+
+        $expected_html = <<<EOT
+<div class="panel panel-secondary panel-flex">\n
+<div class="panel-body"></div>\n
+<div class="panel-footer ilBlockInfo"><button class="btn btn-link" data-action="">Action</button></div>\n
+</div>\n
+
+EOT;
+        $this->assertHTMLEquals(
+            $this->cleanHTML($expected_html),
+            $this->cleanHTML($html)
+        );
+    }
+
+    public function test_render_with_no_header_but_content()
+    {
+
+        $group = new I\Component\Item\Group("Subtitle 1", array(
+                new I\Component\Item\Standard("title1"),
+                new I\Component\Item\Standard("title2"))
+        );
+
+        $secondary_panel = $this->getUIFactory()->panelSecondary()->listing("", array($group));
+
+        $html = $this->getDefaultRenderer()->render($secondary_panel);
+
+        $expected_html = <<<EOT
+<div class="panel panel-secondary panel-flex">
+<div class="panel-body">
+<div class="il-item-group">\n
+    <h3>Subtitle 1</h3>\n
+<div class="il-item-group-items">\n
+<div class="il-std-item-container">
+<div class="il-item il-std-item ">
+<div class="il-item-title">title1</div>
+</div></div>\n
+<div class="il-std-item-container">
+<div class="il-item il-std-item ">
+<div class="il-item-title">title2</div>
+</div>
+</div>\n
+</div>\n
+</div>
+</div>
+</div>\n
+EOT;
+        $this->assertHTMLEquals(
+            $this->cleanHTML($expected_html),
+            $this->cleanHTML($html)
+        );
+    }
+
+    public function test_render_with_no_header_no_content_no_footer()
+    {
+
+        $secondary_panel = $this->getUIFactory()->panelSecondary()->listing("", array());
+
+        $html = $this->getDefaultRenderer()->render($secondary_panel);
+
+        $this->assertEquals("",$html);
     }
 }

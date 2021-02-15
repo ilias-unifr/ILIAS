@@ -72,6 +72,23 @@ class CombinedSlateTest extends ILIAS_UI_TestBase
         );
     }
 
+    public function testRenderingWithAriaRole()
+    {
+        $name = 'name';
+        $icon = $this->icon_factory->custom('', '');
+        $slate = new Combined($this->sig_gen, $name, $icon);
+        $slate = $slate->withAriaRole(Combined::MENU);
+
+        $r = $this->getDefaultRenderer();
+        $html = $r->render($slate);
+
+        $expected = '<div class="il-maincontrols-slate disengaged" id="id_1" role="menu"><div class="il-maincontrols-slate-content" data-replace-marker="content"></div></div>';
+        $this->assertEquals(
+            $expected,
+            $this->brutallyTrimHTML($html)
+        );
+    }
+
     public function testRenderingWithSubDivider()
     {
         $name = 'name';
@@ -91,7 +108,7 @@ class CombinedSlateTest extends ILIAS_UI_TestBase
 		<div class="il-maincontrols-slate disengaged" id="id_1">
 		<div class="il-maincontrols-slate-content" data-replace-marker="content">
 		<hr class="il-divider-with-label" />
-		<h6 class="il-divider">Title</h6>
+		<h4 class="il-divider">Title</h4>
 		<hr /></div></div>
 EOT;
         $this->assertEquals(

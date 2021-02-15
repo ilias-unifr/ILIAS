@@ -41,7 +41,7 @@ ILIAS is a powerful Open Source Learning Management System for developing and re
    1. [Major Upgrade](#major-upgrade)
    1. [Database Update](#database-update)
    1. [Information on Updates](#information-on-updates)
-1. [Upgrading Dependencies](#upgrading-dependencies)
+1. [DBMS](#dbms)
    1. [PHP](#php)
    1. [MySQL](#mysql)
    1. [ImageMagick](#imagemagick)
@@ -105,7 +105,7 @@ Please note that different configurations SHOULD be possible, but it might be ha
   * Server OS: Linux
   * Web Server: Apache 2.4 (mod_php, php-fpm)
   * Databases: MySQL/MariaDB 5.6 and 5.7 and Galera (experimental), PostgreSQL 9.x
-  * PHP: Version 7.2 and 7.3 are supported
+  * PHP: Version 7.2, 7.3 and 7.4 are supported
   * zip: 3.0+
   * unzip: 6.0+
   * Imagemagick: 6.8.9-9+
@@ -117,17 +117,18 @@ Please note that different configurations SHOULD be possible, but it might be ha
 ### Client
 
   * Desktop: Windows 7+, MacOS X 10.7+, Linux
-  * Web Browser: IE11+, Microsoft Edge, Firefox 14+, Chrome 18+, Safari 7+
+  * Web Browser: Microsoft Edge, Firefox 14+, Chrome 18+, Safari 7+
 
 <a name="database-recommendations"></a>
 ## Database Recommendations
 
-> Please note that installing ILIAS in utf8mb4-collations is currently not supported! ILIAS supports utf8mb3 only.
+> Please note that installing ILIAS in utf8mb4-collations is currently not supported! ILIAS supports UTF-8 (with 3 bytes per character, such as utf8_general_ci) only.
 
 We RECOMMEND to use MySQL/MariaDB with the following settings:
 
   * InnoDB storage engine
-  * utf8_general_ci
+  * Character Set: utf8
+  * Collation: utf8_general_ci
   * query_cache_size (> 16M)
   * join_buffer_size (> 128.0K, or always use indexes with joins)
   * table_open_cache (> 400)
@@ -176,6 +177,9 @@ the source, run the following in your ILIAS folder:
 ```
 composer install --no-dev
 ```
+
+This requires that the php dependency manager [composer](https://getcomposer.org/)
+is available in your $PATH.
 
 The files SHOULD be owned by your webserver user/group (e.g. ```www-data``` or
 ```apache```) the mode SHOULD be 644 for files and 755 for directories.
@@ -250,7 +254,7 @@ systemctl restart httpd.service
 
 On Debian/Ubuntu 14.04 or 16.04 execute:
 ```
-apt-get install libapache2-mod-php7.1 php7.1-gd php7.1-mysql php7.1-mbstring php7.1-curl php7.1-dom php7.1-zip php-xml
+apt-get install libapache2-mod-php7.1 php7.1-gd php7.1-mysql php7.1-mbstring php7.1-curl php7.1-dom php7.1-zip php7.1-xml php7.1-soap
 ```
 
 On RHEL/CentOS execute:
@@ -445,7 +449,6 @@ Depending on your use case, you MAY want to install further dependencies (exact 
 
 * php-curl
 * php-xmlrpc
-* php-soap
 * php-ldap
 * ffmpeg
 * mimetex
@@ -595,7 +598,7 @@ When you upgrade from rather old versions please make sure that the dependencies
 
 | ILIAS Version   | PHP Version                           |
 |-----------------|---------------------------------------|
-| 6.0.x           | 7.2.x, 7.3.x                          |
+| 6.0.x           | 7.2.x, 7.3.x, 7.4                     |
 | 5.4.x           | 7.0.x, 7.1.x, 7.2.x, 7.3.x            |
 | 5.3.x           | 5.6.x, 7.0.x, 7.1.x                   |
 | 5.2.x           | 5.5.x - 5.6.x, 7.0.x, 7.1.x           |
@@ -606,18 +609,19 @@ When you upgrade from rather old versions please make sure that the dependencies
 | 4.0.x - 4.1.x   | 5.1.4 - 5.3.x                         |
 | 3.8.x - 3.10.x  | 5.1.4 - 5.2.x                         |
 
-<a name="mysql"></a>
-## MySQL
+<a name="dbms"></a>
+## DBMS
 
-| ILIAS Version   | MySQL Version                         |
-|-----------------|---------------------------------------|
-| 5.4.x - x.x.x   | 5.6.x, 5.7.x                          |
-| 5.3.x - 5.4.x   | 5.5.x, 5.6.x, 5.7.x                   |
-| 4.4.x - 5.2.x   | 5.0.x, 5.1.32 - 5.1.x, 5.5.x, 5.6.x   |
-| 4.2.x - 4.3.x   | 5.0.x, 5.1.32 - 5.1.x, 5.5.x          |
-| 4.0.x - 4.1.x   | 5.0.x, 5.1.32 - 5.1.x                 |
-| 3.10.x          | 4.1.x, 5.0.x, 5.1.32 - 5.1.x          |
-| 3.7.3 - 3.9.x   | 4.0.x - 5.0.x                         |
+| ILIAS Version   | MySQL Version                       | MariaDB Version         | Postgres (experimental)  |
+|-----------------|-------------------------------------|-------------------------|--------------------------|
+| 6.0 - 6.x       | 5.6.x, 5.7.x, 8.0.x                 | 10.0, 10.1, 10.2, 10.3  | 9.x                      |
+| 5.4.x - x.x.x   | 5.6.x, 5.7.x                        |                         |                          |
+| 5.3.x - 5.4.x   | 5.5.x, 5.6.x, 5.7.x                 |                         |                          |
+| 4.4.x - 5.2.x   | 5.0.x, 5.1.32 - 5.1.x, 5.5.x, 5.6.x |                         |                          |
+| 4.2.x - 4.3.x   | 5.0.x, 5.1.32 - 5.1.x, 5.5.x        |                         |                          |
+| 4.0.x - 4.1.x   | 5.0.x, 5.1.32 - 5.1.x               |                         |                          |
+| 3.10.x          | 4.1.x, 5.0.x, 5.1.32 - 5.1.x        |                         |                          |
+| 3.7.3 - 3.9.x   | 4.0.x - 5.0.x                       |                         |                          |
 
 <a name="imagemagick"></a>
 ## ImageMagick
@@ -647,19 +651,18 @@ Pull-Request will be assigned to the responsible maintainer(s). See further info
 <a name="reference-system"></a>
 ## Reference System
 
-The ILIAS Testserver (https://test54.ilias.de) is currently configured as follows:
+The ILIAS Testserver (https://test6.ilias.de) is currently configured as follows:
 
 | Package        | Version                     |
 |----------------|-----------------------------|
-| Distribution   | Ubuntu 16.04.1 LTS          |
-| MySQL          | MySQL 5.5.58                |
-| MariaDB        | 10.1                        |
-| PHP            | 7.1.20                      |
-| Apache         | 2.4.7                       |
-| Nginx          | 1.4.6                       |
+| Distribution   | Ubuntu 16.04.7 LTS          |
+| MariaDB        | 10.0.38                     |
+| mysql          | 5.6                         |
+| PHP            | 7.3.22                      |
+| Apache         | 2.4.18                      |
 | zip            | 3.0                         |
 | unzip          | 6.00                        |
-| JDK            | 1.7.0_121 (IcedTea 2.6.8)   |
-| NodeJS         | 8.9.4 LTS                   |
+| JDK            | 1.8.0_265                   |
+| NodeJS         | v10.22.0                    |
 
 Please note: Shibboleth won't work with Nginx.

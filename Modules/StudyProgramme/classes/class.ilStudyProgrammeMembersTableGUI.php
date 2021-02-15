@@ -289,22 +289,20 @@ class ilStudyProgrammeMembersTableGUI extends ilTable2GUI
         int $usr_id
     ) : string {
         $l = new ilAdvancedSelectionListGUI();
-        $no_orgu_position_access_ctrl = !$this->prg->getAccessControlByOrguPositionsGlobal();
 
-        $view_individual_plan =
-            $no_orgu_position_access_ctrl ||
-            in_array($usr_id, $this->getParentObject()->viewIndividualPlan())
-        ;
+        $access_by_position = $this->isPermissionControlledByOrguPosition();
+        $parent = $this->getParentObject();
 
-        $manage_members =
-            $no_orgu_position_access_ctrl ||
-            in_array($usr_id, $this->getParentObject()->manageMembers())
-        ;
+        $view_individual_plan = $parent->isOperationAllowedForUser(
+            $usr_id,
+            ilOrgUnitOperation::OP_VIEW_INDIVIDUAL_PLAN
+        );
 
-        $edit_individual_plan =
-            $no_orgu_position_access_ctrl ||
-            in_array($usr_id, $this->getParentObject()->editIndividualPlan())
-        ;
+        $edit_individual_plan = $parent->isOperationAllowedForUser(
+            $usr_id,
+            ilOrgUnitOperation::OP_VIEW_INDIVIDUAL_PLAN
+        );
+
 
         foreach ($actions as $action) {
             switch ($action) {
@@ -320,6 +318,10 @@ class ilStudyProgrammeMembersTableGUI extends ilTable2GUI
                     }
                     break;
                 case ilStudyProgrammeUserProgress::ACTION_REMOVE_USER:
+                    $manage_members =
+                        $parent->isOperationAllowedForUser($usr_id, ilOrgUnitOperation::OP_MANAGE_MEMBERS)
+                        && in_array($usr_id, $this->getParentObject()->getLocalMembers());
+
                     if (!$manage_members) {
                         continue 2;
                     }
@@ -391,6 +393,7 @@ class ilStudyProgrammeMembersTableGUI extends ilTable2GUI
         $sql .= $this->getFrom();
         $sql .= $this->getWhere($prg_id);
         $sql .= $this->getFilterWhere($filter);
+        $sql .= $this->getOrguValidUsersFilter();
 
         if ($limit !== null) {
             $this->db->setLimit($limit, $offset !== null ? $offset : 0);
@@ -399,6 +402,7 @@ class ilStudyProgrammeMembersTableGUI extends ilTable2GUI
         $res = $this->db->query($sql);
         $now = (new DateTime())->format('Y-m-d H:i:s');
         $members_list = array();
+
 
         while ($rec = $this->db->fetchAssoc($res)) {
             $rec["actions"] = ilStudyProgrammeUserProgress::getPossibleActions(
@@ -559,16 +563,36 @@ class ilStudyProgrammeMembersTableGUI extends ilTable2GUI
      */
     protected function getMultiCommands() : array
     {
-        return [
-            'markAccreditedMulti' => $this->lng->txt('prg_multi_mark_accredited'),
-            'unmarkAccreditedMulti' => $this->lng->txt('prg_multi_unmark_accredited'),
-            'removeUserMulti' => $this->lng->txt('prg_multi_remove_user'),
-            'markRelevantMulti' => $this->lng->txt('prg_multi_mark_relevant'),
-            'markNotRelevantMulti' => $this->lng->txt('prg_multi_unmark_relevant'),
-            'updateFromCurrentPlanMulti' => $this->lng->txt('prg_multi_update_from_current_plan'),
-            'changeDeadlineMulti' => $this->lng->txt('prg_multi_change_deadline'),
-            'changeExpireDateMulti' => $this->lng->txt('prg_multi_change_expire_date')
-        ];
+        $access_by_position = $this->isPermissionControlledByOrguPosition();
+        if ($access_by_position) {
+            $edit_individual_plan = count($this->getParentObject()->editIndividualPlan()) > 0;
+            $manage_members = count($this->getParentObject()->manageMembers()) > 0;
+        } else {
+            $edit_individual_plan = true;
+            $manage_members = true;
+        }
+
+        $perms = [];
+        if ($edit_individual_plan) {
+            $perms['markAccreditedMulti'] = $this->lng->txt('prg_multi_mark_accredited');
+            $perms['unmarkAccreditedMulti'] = $this->lng->txt('prg_multi_unmark_accredited');
+        }
+
+        if ($manage_members) {
+            $perms['removeUserMulti'] = $this->lng->txt('prg_multi_remove_user');
+        }
+        $perms = array_merge(
+            $perms,
+            [
+                'markRelevantMulti' => $this->lng->txt('prg_multi_mark_relevant'),
+                'markNotRelevantMulti' => $this->lng->txt('prg_multi_unmark_relevant'),
+                'updateFromCurrentPlanMulti' => $this->lng->txt('prg_multi_update_from_current_plan'),
+                'changeDeadlineMulti' => $this->lng->txt('prg_multi_change_deadline'),
+                'changeExpireDateMulti' => $this->lng->txt('prg_multi_change_expire_date')
+            ]
+        );
+
+        return $perms;
     }
 
     /**
@@ -674,5 +698,33 @@ class ilStudyProgrammeMembersTableGUI extends ilTable2GUI
         $conditions = implode(PHP_EOL, $buf);
 
         return $conditions;
+    }
+
+
+    protected function isPermissionControlledByOrguPosition()
+    {
+        return (
+            $this->prg->getAccessControlByOrguPositionsGlobal()
+            ||
+            $this->prg->getPositionSettingsIsActiveForPrg()
+        );
+    }
+
+    protected function getOrguValidUsersFilter() : string
+    {
+        if ($this->getParentObject()->mayManageMembers()) {
+            return '';
+        }
+
+        $valid_user_ids = $this->position_based_access->getUsersInPrgAccessibleForOperation(
+            $this->getParentObject()->object,
+            ilOrgUnitOperation::OP_MANAGE_MEMBERS
+        );
+        if (count($valid_user_ids) < 1) {
+            return ' AND false';
+        }
+        return ' AND pcp.usr_id in ('
+            . implode(',', $valid_user_ids)
+            . ')';
     }
 }

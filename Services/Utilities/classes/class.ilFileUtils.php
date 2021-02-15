@@ -669,6 +669,7 @@ class ilFileUtils
             'gif',   // IMAGE__GIF,
             'gl',   // VIDEO__GL,
             'gan',
+            'ggb', // GEOGEBRA
             'gsd',   // AUDIO__X_GSM,
             'gsm',   // AUDIO__X_GSM,
             'gtar',   // APPLICATION__X_GTAR,
@@ -909,7 +910,7 @@ class ilFileUtils
         $pi = pathinfo($a_target);
         if (!in_array(strtolower($pi["extension"]), self::getValidExtensions())) {
             include_once("./Services/Utilities/classes/class.ilFileUtilsException.php");
-            throw new ilFileUtilsException("Invalid target file " . $pi["basename"] . ".");
+            throw new ilFileUtilsException("Invalid target file");
         }
 
         return rename($a_source, $a_target);

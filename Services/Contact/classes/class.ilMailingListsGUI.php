@@ -81,6 +81,13 @@ class ilMailingListsGUI
 
     public function executeCommand()
     {
+        if (
+            !ilBuddySystem::getInstance()->isEnabled() ||
+            0 === count(ilBuddyList::getInstanceByGlobalUser()->getLinkedRelations())
+        ) {
+            $this->error->raiseError($this->lng->txt('msg_no_perm_read'), $this->error->MESSAGE);
+        }
+
         $forward_class = $this->ctrl->getNextClass($this);
         switch ($forward_class) {
             default:
@@ -188,7 +195,6 @@ class ilMailingListsGUI
                 $mail_data['rcp_to'],
                 $mail_data['rcp_cc'],
                 $mail_data['rcp_bcc'],
-                $mail_data['m_type'],
                 $mail_data['m_email'],
                 $mail_data['m_subject'],
                 $mail_data['m_message'],

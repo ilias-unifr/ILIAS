@@ -1516,6 +1516,7 @@ class ilObjectListGUI
                 $this->tpl->setCurrentBlock("item_title_linked");
                 $this->tpl->setVariable("PREVIEW_STATUS_CLASS", $preview_status_class);
                 $this->tpl->setVariable("SRC_PREVIEW_ICON", ilUtil::getImagePath("preview.png", "Services/Preview"));
+                $this->tpl->setVariable("ALT_PREVIEW_ICON", $this->lng->txt($preview_text_topic));
                 $this->tpl->setVariable("TXT_PREVIEW", $this->lng->txt($preview_text_topic));
                 $this->tpl->setVariable("SCRIPT_PREVIEW_CLICK", $preview->getJSCall($this->getUniqueItemId(true)));
                 $this->tpl->parseCurrentBlock();
@@ -3033,7 +3034,7 @@ class ilObjectListGUI
                             $htpl->setVariable("TAG", "span");
                         }
                         $htpl->setVariable("PROP_ID", $id);
-                        $htpl->setVariable("IMG", ilUtil::img($attr["img"]));
+                        $htpl->setVariable("IMG", ilUtil::img($attr["img"], $attr["tooltip"]));
                         if ($attr["href"] != "") {
                             $htpl->setVariable("PROP_HREF", ' href="' . $attr["href"] . '" ');
                         }
@@ -3225,6 +3226,7 @@ class ilObjectListGUI
             // icon link
             if ($this->title_link_disabled || !$this->default_command || (!$this->getCommandsStatus() && !$this->restrict_to_goto)) {
             } else {
+                /*  see #28926
                 $this->tpl->setCurrentBlock("icon_link_s");
 
                 if ($this->default_command["frame"] != "") {
@@ -3237,14 +3239,15 @@ class ilObjectListGUI
                 );
                 $this->tpl->parseCurrentBlock();
                 $this->tpl->touchBlock("icon_link_e");
+                */
             }
 
             $this->tpl->setCurrentBlock("icon");
             if (!$objDefinition->isPlugin($this->getIconImageType())) {
-                $this->tpl->setVariable("ALT_ICON", $lng->txt("icon") . " " . $lng->txt("obj_" . $this->getIconImageType()));
+                $this->tpl->setVariable("ALT_ICON", $lng->txt("obj_" . $this->getIconImageType()));
             } else {
                 include_once("Services/Component/classes/class.ilPlugin.php");
-                $this->tpl->setVariable("ALT_ICON", $lng->txt("icon") . " " .
+                $this->tpl->setVariable("ALT_ICON",
                     ilObjectPlugin::lookupTxtById($this->getIconImageType(), "obj_" . $this->getIconImageType()));
             }
 
@@ -3844,6 +3847,9 @@ class ilObjectListGUI
             $description
         );
 
+        $user = $this->user;
+        $access = $this->access;
+
         $this->enableCommands(true);
 
         $sections = [];
@@ -3933,6 +3939,25 @@ class ilObjectListGUI
             ->icon()
             ->standard($type, $this->lng->txt('obj_' . $type))
             ->withIsOutlined(true);
+
+        // card title action
+        $card_title_action = "";
+        if ($def_command["link"] != "" && ($def_command["frame"] == "" || $modified_link != $def_command["link"])) {	// #24256
+            $card_title_action = $modified_link;
+        } else if ($def_command['link'] == "" &&
+            $this->getInfoScreenStatus() &&
+            $access->checkAccessOfUser(
+                $user->getId(),
+                "visible",
+                "",
+                $ref_id
+            )) {
+            $card_title_action = ilLink::_getLink($ref_id);
+            if ($image->getAction() == "") {
+                $image = $image->withAction($card_title_action);
+            }
+        }
+
         $card = $ui->factory()->card()->repositoryObject(
             $title . '<span data-list-item-id="' . $this->getUniqueItemId(true) . '"></span>',
             $image
@@ -3942,14 +3967,13 @@ class ilObjectListGUI
             $dropdown
         );
 
-        // #24256
-        if ($def_command['link'] && ($def_command["frame"] == "" || $modified_link != $def_command["link"])) {
-            $card = $card->withTitleAction($modified_link);
+        if ($card_title_action != "") {
+            $card = $card->withTitleAction($card_title_action);
         }
 
         $l = [];
         foreach ($this->determineProperties() as $p) {
-            if ($p['property'] !== $this->lng->txt('learning_progress')) {
+            if ($p["alert"] && $p['property'] !== $this->lng->txt('learning_progress')) {
                 $l[(string) $p['property']] = (string) $p['value'];
             }
         }

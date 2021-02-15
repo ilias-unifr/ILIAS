@@ -206,11 +206,31 @@ class ilStartUpGUI
 
         $this->getLogger()->debug('Showing login page');
 
+        $extUid = '';
+        if (isset($_GET['ext_uid']) && is_string($_GET['ext_uid'])) {
+            $extUid = $_GET['ext_uid'];
+        }
+        $soapPw = '';
+        if (isset($_GET['soap_pw']) && is_string($_GET['soap_pw'])) {
+            $soapPw = $_GET['soap_pw'];
+        }
+
+        require_once 'Services/Authentication/classes/Frontend/class.ilAuthFrontendCredentialsSoap.php';
+        $credentials = new ilAuthFrontendCredentialsSoap($GLOBALS['DIC']->http()->request(), $this->ctrl, $ilSetting);
+        $credentials->setUsername(ilUtil::stripSlashes($extUid));
+        $credentials->setPassword(ilUtil::stripSlashes($soapPw));
+        $credentials->tryAuthenticationOnLoginPage();
+        
+        // try apache auth
+        include_once './Services/Authentication/classes/Frontend/class.ilAuthFrontendCredentialsApache.php';
         $frontend = new ilAuthFrontendCredentialsApache($this->httpRequest, $this->ctrl);
         $frontend->tryAuthenticationOnLoginPage();
 
         // Instantiate login template
         $tpl = self::initStartUpTemplate("tpl.login.html");
+
+        $this->mainTemplate->addCss(ilObjStyleSheet::getContentStylePath(0));
+        $this->mainTemplate->addCss(ilObjStyleSheet::getSyntaxStylePath());
 
         $page_editor_html = $this->getLoginPageEditorHTML();
         $page_editor_html = $this->showOpenIdConnectLoginForm($page_editor_html);
@@ -1397,7 +1417,7 @@ class ilStartUpGUI
         $tpl->setVariable("PAGETITLE", $lng->txt("clientlist_clientlist"));
 
         // load client list template
-        self::initStartUpTemplate("tpl.client_list.html");
+        $tpl = self::initStartUpTemplate("tpl.client_list.html");
 
         // load template for table
         $tpl->addBlockfile("CLIENT_LIST", "client_list", "tpl.table.html");
@@ -1408,10 +1428,8 @@ class ilStartUpGUI
         // load table content data
         require_once("setup/classes/class.ilClientList.php");
         require_once("setup/classes/class.ilClient.php");
-        require_once("setup/classes/class.ilDBConnections.php");
         require_once("./Services/Table/classes/class.ilTableGUI.php");
-        $this->db_connections = new ilDBConnections();
-        $clientlist = new ilClientList($this->db_connections);
+        $clientlist = new \ilClientList();
         $list = $clientlist->getClients();
 
         if (count($list) == 0) {
@@ -1443,7 +1461,7 @@ class ilStartUpGUI
         }
 
         // create table
-        $tbl = new ilTableGUI();
+        $tbl = new ilTableGUI('', false);
 
         // title & header columns
         if ($hasPublicSection) {
@@ -1473,8 +1491,8 @@ class ilStartUpGUI
         $tbl->disable("footer");
 
         // render table
-        $tbl->render();
-        $tpl->printToStdout("DEFAULT", true, true);
+        $html_for_nothing = $tbl->render();
+        self::printToGlobalTemplate($tbl->getTemplateObject());
     }
 
     /**
@@ -1601,7 +1619,10 @@ class ilStartUpGUI
 
     public static function _checkGoto($a_target)
     {
+        global $DIC;
         global $objDefinition, $ilPluginAdmin, $ilUser;
+
+        $access = $DIC->access();
 
 
         if (is_object($ilPluginAdmin)) {
@@ -1684,11 +1705,10 @@ class ilStartUpGUI
                 $pobj_id = ilObject::_lookupObjId($path_ref_id);
 
                 // core checks: timings/object-specific
-                if (!$ilAccess->checkAccess(
-                    'read',
-                    '',
-                    $path_ref_id
-                )) {
+                if (
+                    !$access->doActivationCheck('read', '', $path_ref_id, $ilUser->getId(), $pobj_id, $ptype) ||
+                    !$access->doStatusCheck('read', '', $path_ref_id, $ilUser->getId(), $pobj_id, $ptype)
+                ) {
                     // object in path is inaccessible - aborting
                     return false;
                 } elseif ($ptype == "crs") {
@@ -1898,7 +1918,7 @@ class ilStartUpGUI
         }
         PageContentProvider::setShortTitle($short_title);
 
-        $header_title = ilObjSystemFolder::_getHeaderTitle();
+        $header_title = (string) ilObjSystemFolder::_getHeaderTitle();
         PageContentProvider::setTitle($header_title);
 
         return $tpl;
@@ -1947,9 +1967,14 @@ class ilStartUpGUI
     {
         global $DIC;
 
+        $lang = $DIC->language();
+
         $oidc_settings = ilOpenIdConnectSettings::getInstance();
         if ($oidc_settings->getActive()) {
             $tpl = new ilTemplate('tpl.login_element.html', true, true, 'Services/OpenIdConnect');
+
+            $lang->loadLanguageModule('auth');
+            $tpl->setVariable('TXT_OIDCONNECT_HEADER', $lang->txt('auth_oidc_login_element_info'));
 
             $target = empty($_GET['target']) ? '' : ('?target=' . (string) $_GET['target']);
             switch ($oidc_settings->getLoginElementType()) {
@@ -1967,7 +1992,7 @@ class ilStartUpGUI
             }
 
             return $this->substituteLoginPageElements(
-                $DIC->ui()->mainTemplate(),
+                $GLOBALS['tpl'],
                 $page_editor_html,
                 $tpl->get(),
                 '[list-openid-connect-login]',
@@ -2051,30 +2076,78 @@ class ilStartUpGUI
             $auth->storeParam('target', $params['returnTo']);
         }
 
+        ilLoggerFactory::getLogger('auth')->debug('Started SAML authentication request');
+
         if (!$auth->isAuthenticated()) {
+            ilLoggerFactory::getLogger('auth')->debug('User is not authenticated, yet');
             if (!isset($_GET['idpentityid']) || !isset($_GET['saml_idp_id'])) {
                 $activeIdps = ilSamlIdp::getActiveIdpList();
                 if (1 == count($activeIdps)) {
                     $idp = current($activeIdps);
                     $_GET['idpentityid'] = $idp->getEntityId();
                     $_GET['saml_idp_id'] = $idp->getIdpId();
+
+                    ilLoggerFactory::getLogger('auth')->debug(sprintf(
+                        'Found exactly one active IDP with id %s: %s',
+                        $idp->getIdpId(),
+                        $idp->getEntityId()
+                    ));
                 } elseif (0 == count($activeIdps)) {
+                    ilLoggerFactory::getLogger('auth')->debug('Did not find any active IDP, skipp authentication process');
                     $GLOBALS['DIC']->ctrl()->redirect($this, 'showLoginPage');
                 } else {
+                    ilLoggerFactory::getLogger('auth')->debug('Found multiple active IPDs, presenting IDP selection...');
                     $this->showSamlIdpSelection($auth, $activeIdps);
                     return;
                 }
             }
+
             $auth->storeParam('idpId', (int) $_GET['saml_idp_id']);
+            ilLoggerFactory::getLogger('auth')->debug(sprintf(
+                'Stored relevant IDP id in session: %s',
+                (string) $auth->getParam('idpId')
+            ));
         }
 
         // re-init
         $auth = $factory->auth();
+
+        ilLoggerFactory::getLogger('auth')->debug('Checking SAML authentication status...');
+
         $auth->protectResource();
 
+        ilLoggerFactory::getLogger('auth')->debug(
+            'SAML authentication successful, continuing with ILIAS internal authentication process...'
+        );
+
+        $idpId = (int) $auth->getParam('idpId');
+
+        ilLoggerFactory::getLogger('auth')->debug(sprintf(
+            'Internal SAML IDP id fetched from session: %s',
+            (string) $idpId
+        ));
+
+        if ($idpId < 1) {
+            ilLoggerFactory::getLogger('auth')->debug(
+                'No valid internal IDP id found (most probably due to IDP initiated SSO), trying fallback determination...'
+            );
+            $authData = $auth->getAuthDataArray();
+            if (isset($authData['saml:sp:IdP'])) {
+                $idpId = ilSamlIdp::geIdpIdByEntityId($authData['saml:sp:IdP']);
+                ilLoggerFactory::getLogger('auth')->debug(sprintf(
+                    'Searching active ILIAS IDP by entity id "%s" results in: %s',
+                    $authData['saml:sp:IdP'],
+                    (string) $idpId
+                ));
+            } else {
+                ilLoggerFactory::getLogger('auth')->debug(
+                    'Could not execute fallback determination, no IDP entity ID found SAML authentication session data'
+                );
+            }
+        }
         $_GET['target'] = $auth->popParam('target');
 
-        $_POST['auth_mode'] = AUTH_SAML . '_' . ((int) $auth->getParam('idpId'));
+        $_POST['auth_mode'] = AUTH_SAML . '_' . $idpId;
 
         $credentials = new ilAuthFrontendCredentialsSaml($auth);
         $credentials->initFromRequest();
@@ -2125,7 +2198,6 @@ class ilStartUpGUI
 
         self::initStartUpTemplate(array('tpl.saml_idp_selection.html', 'Services/Saml'));
 
-        $mainTpl = $DIC->ui()->mainTemplate();
         $factory = $DIC->ui()->factory();
         $renderer = $DIC->ui()->renderer();
 
@@ -2145,11 +2217,8 @@ class ilStartUpGUI
         }
 
         $table->setData($items);
-        $mainTpl->setVariable('CONTENT', $table->getHtml());
+        $this->mainTemplate->setVariable('CONTENT', $table->getHtml());
 
-        $mainTpl->fillWindowTitle();
-        $mainTpl->fillCssFiles();
-        $mainTpl->fillJavaScriptFiles();
-        $mainTpl->printToStdout('DEFAULT', false);
+        $this->mainTemplate->printToStdout('DEFAULT', false);
     }
 }

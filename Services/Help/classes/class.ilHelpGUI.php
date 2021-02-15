@@ -260,7 +260,7 @@ class ilHelpGUI
                 $grp_list = new ilGroupedListGUI();
                 foreach ($pages as $pg) {
                     $grp_list->addEntry(
-                        $this->replaceMenuItemTags(ilLMObject::_lookupTitle($pg["child"])),
+                        $this->replaceMenuItemTags((string) ilLMObject::_lookupTitle($pg["child"])),
                         "#",
                         "",
                         "return il.Help.showPage(" . $pg["child"] . ");"
@@ -301,6 +301,7 @@ class ilHelpGUI
     public function showPage()
     {
         $lng = $this->lng;
+        $ui = $this->ui;
         
         $page_id = (int) $_GET["help_page"];
         
@@ -308,25 +309,23 @@ class ilHelpGUI
         include_once("./Modules/LearningModule/classes/class.ilLMObject.php");
 
 
-        $h_tpl->setCurrentBlock("backlink");
-        $h_tpl->setVariable("TXT_BACK", $lng->txt("back"));
         if (($t = ilSession::get("help_search_term")) != "") {
-            $h_tpl->setVariable(
-                "ONCLICK_BACK",
-                "return il.Help.search('" . ilUtil::prepareFormOutput($t) . "');"
-            );
+            $back_button = $ui->factory()->button()->bulky($ui->factory()->symbol()->glyph()->back(), $lng->txt("back"), "#")->withOnLoadCode(function ($id) use ($t) {
+                return
+                    "$(\"#$id\").click(function() { return il.Help.search('" . ilUtil::prepareFormOutput($t) . "'); return false;});";
+            });
+            $h_tpl->setVariable("BACKBUTTON", $ui->renderer()->renderAsync($back_button));
         } else {
-            $h_tpl->setVariable(
-                "ONCLICK_BACK",
-                "return il.Help.listHelp(event, true);"
-            );
+            $back_button = $ui->factory()->button()->bulky($ui->factory()->symbol()->glyph()->back(), $lng->txt("back"), "#")->withOnLoadCode(function ($id) {
+                return
+                    "$(\"#$id\").click(function() { return il.Help.listHelp(event, true); return false;});";
+            });
+            $h_tpl->setVariable("BACKBUTTON", $ui->renderer()->renderAsync($back_button));
         }
-        $h_tpl->parseCurrentBlock();
-        
         
         $h_tpl->setVariable(
             "HEAD",
-            $this->replaceMenuItemTags(ilLMObject::_lookupTitle($page_id))
+            $this->replaceMenuItemTags((string) ilLMObject::_lookupTitle($page_id))
         );
         
         include_once("./Services/COPage/classes/class.ilPageUtil.php");
@@ -356,7 +355,7 @@ class ilHelpGUI
         //echo htmlentities($link_xml);
         $page_gui->setLinkXML($link_xml);
         
-        $ret = $this->replaceMenuItemTags($page_gui->showPage());
+        $ret = $this->replaceMenuItemTags((string) $page_gui->showPage());
 
         $h_tpl->setVariable("CONTENT", $ret);
         include_once("./Services/UIComponent/Glyph/classes/class.ilGlyphGUI.php");
@@ -547,6 +546,7 @@ class ilHelpGUI
     public function search()
     {
         $lng = $this->lng;
+        $ui = $this->ui;
 
         $term = $_GET["term"];
 
@@ -559,14 +559,12 @@ class ilHelpGUI
         $h_tpl = new ilTemplate("tpl.help.html", true, true, "Services/Help");
         include_once("./Modules/LearningModule/classes/class.ilLMObject.php");
 
-        $h_tpl->setCurrentBlock("backlink");
-        $h_tpl->setVariable("TXT_BACK", $lng->txt("back"));
-        $h_tpl->setVariable(
-            "ONCLICK_BACK",
-            "return il.Help.listHelp(event, true);"
-        );
-        $h_tpl->parseCurrentBlock();
 
+        $back_button = $ui->factory()->button()->bulky($ui->factory()->symbol()->glyph()->back(), $lng->txt("back"), "#")->withOnLoadCode(function ($id) {
+            return
+                "$(\"#$id\").click(function() { return il.Help.listHelp(event, true); return false;});";
+        });
+        $h_tpl->setVariable("BACKBUTTON", $ui->renderer()->renderAsync($back_button));
 
         $h_tpl->setVariable("HEAD", $lng->txt("help") . " - " .
             $lng->txt("search_result"));
@@ -644,17 +642,23 @@ class ilHelpGUI
      */
     protected function replaceItemTag($mmc, string $content, \ILIAS\GlobalScreen\Scope\MainMenu\Factory\isItem $item)
     {
+        global $DIC;
+        $mmc = $DIC->globalScreen()->collector()->mainmenu();
+
         $id = $item->getProviderIdentification()->getInternalIdentifier();
         $ws = "[ \t\r\f\v\n]*";
 
         // menu item path
         while (preg_match("~\[(menu" . $ws . "path$ws=$ws(\"$id\")$ws)/\]~i", $content, $found)) {
             $path = "";
-            if ($item->getParent() != null) {
-                $parent = $mmc->getSingleItem($item->getParent());
-                $path = $parent->getTitle() . " > ";
+            if ($item instanceof \ILIAS\GlobalScreen\Scope\MainMenu\Factory\isChild) {
+                $parent = $mmc->getItemInformation()->getParent($item);
+                if ($parent !== null) {
+                    $parent = $mmc->getSingleItemFromRaw($parent);
+                    $path = $this->getTitleForItem($parent) . " > ";
+                }
             }
-            $path .= $item->getTitle();
+            $path .= $this->getTitleForItem($item);
             $content = preg_replace(
                 '~\[' . $found[1] . '/\]~i',
                 "<strong>" . $path . "</strong>",
@@ -665,10 +669,24 @@ class ilHelpGUI
         while (preg_match("~\[(menu" . $ws . "item$ws=$ws(\"$id\")$ws)/\]~i", $content, $found)) {
             $content = preg_replace(
                 '~\[' . $found[1] . '/\]~i',
-                "<strong>" . $item->getTitle() . "</strong>",
+                "<strong>" . $this->getTitleForItem($item) . "</strong>",
                 $content
             );
         }
         return $content;
     }
+
+    /**
+     * Get title for item
+     * @param \ILIAS\GlobalScreen\Scope\MainMenu\Factory\isItem $item
+     * @return string
+     * @throws Throwable
+     */
+    protected function getTitleForItem(\ILIAS\GlobalScreen\Scope\MainMenu\Factory\isItem $item): string
+    {
+        global $DIC;
+        $mmc = $DIC->globalScreen()->collector()->mainmenu();
+        return $mmc->getItemInformation()->customTranslationForUser($item)->getTitle();
+    }
+
 }

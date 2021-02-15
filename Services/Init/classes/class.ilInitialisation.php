@@ -772,6 +772,7 @@ class ilInitialisation
             }
             // init console log handler
             ilLoggerFactory::getInstance()->initUser($DIC->user()->getLogin());
+            \ilOnlineTracking::updateAccess($DIC->user());
         } else {
             if (is_object($GLOBALS['ilLog'])) {
                 $GLOBALS['ilLog']->logStack();
@@ -1393,8 +1394,9 @@ class ilInitialisation
         $c['global_screen'] = function () use ($c) {
             return new Services(new ilGSProviderFactory($c));
         };
-        $c->globalScreen()->tool()->context()->stack()->main();
-        $c->globalScreen()->tool()->context()->current()->addAdditionalData('DEVMODE', (bool) DEVMODE);
+        $c->globalScreen()->tool()->context()->stack()->clear();
+        $c->globalScreen()->tool()->context()->claim()->main();
+//        $c->globalScreen()->tool()->context()->current()->addAdditionalData('DEVMODE', (bool) DEVMODE);
     }
 
     /**
@@ -1540,7 +1542,8 @@ class ilInitialisation
             return new ILIAS\UI\Implementation\Component\Input\Field\Factory(
                 $c["ui.signal_generator"],
                 $data_factory,
-                $refinery
+                $refinery,
+                $c["lng"]
             );
         };
         $c["ui.factory.input.container"] = function ($c) {
@@ -1898,6 +1901,14 @@ class ilInitialisation
         if (defined("ILIAS_HTTP_PATH") &&
             !stristr($a_target, ILIAS_HTTP_PATH)) {
             $a_target = ILIAS_HTTP_PATH . "/" . $a_target;
+        }
+
+        foreach (['ext_uid', 'soap_pw'] as $param) {
+            if (false === strpos($a_target, $param . '=') && isset($GLOBALS['DIC']->http()->request()->getQueryParams()[$param])) {
+                $a_target = \ilUtil::appendUrlParameterString($a_target, $param . '=' . \ilUtil::stripSlashes(
+                    $GLOBALS['DIC']->http()->request()->getQueryParams()[$param]
+                ));
+            }
         }
 
         if (ilContext::supportsRedirects()) {
